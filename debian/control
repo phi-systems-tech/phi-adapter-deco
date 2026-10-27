@@ -2,14 +2,14 @@ Source: phi-adapter-deco
 Section: net
 Priority: optional
 Maintainer: Marius Schumacher <marius.schumacher@phisys.com>
-Build-Depends: debhelper-compat (= 13), cmake, ninja-build, nlohmann-json3-dev, libssl-dev, phi-adapter-sdk-dev (>= 0.29.1)
+Build-Depends: debhelper-compat (= 13), cmake, ninja-build, nlohmann-json3-dev, libssl-dev, phi-adapter-sdk-dev (>= 0.29.0)
 Standards-Version: 4.7.0
 Rules-Requires-Root: no
 Homepage: https://phisys.com
 
 Package: phi-adapter-deco
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, phi-adapter-sdk (>= 0.29.1)
+Depends: ${shlibs:Depends}, ${misc:Depends}, phi-adapter-sdk (>= 0.29.0)
 Description: PHI TP-Link Deco adapter
  IPC sidecar for a TP-Link Deco mesh: its nodes, and the network's clients
  offered under Add device (presence, access point, signal, WLAN block),
