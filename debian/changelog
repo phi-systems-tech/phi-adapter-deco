@@ -1,3 +1,9 @@
+phi-adapter-deco (0.1.2-1) trixie; urgency=medium
+
+  * Test connection in the config dialog: one login, the nodes, a logout.
+
+ -- Marius Schumacher <marius.schumacher@phisys.com>  Tue, 27 Oct 2026 11:26:28 +0100
+
 phi-adapter-deco (0.1.1-1) trixie; urgency=medium
 
   * Discovery by TDP: the master Deco of each mesh (deco-config.json).

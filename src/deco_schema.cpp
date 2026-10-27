@@ -56,7 +56,10 @@ v1::AdapterCapabilities capabilities()
 {
     v1::AdapterCapabilities caps;
     caps.setRequired(v1::AdapterRequirement::Host | v1::AdapterRequirement::Password);
-    caps.setFlags(v1::AdapterCapability::RequiresPolling | v1::AdapterCapability::NetworkClients);
+    caps.setFlags(v1::AdapterCapability::RequiresPolling | v1::AdapterCapability::NetworkClients
+                  | v1::AdapterCapability::SupportsProbe | v1::AdapterCapability::SupportsDiscovery);
+    // One login, the nodes, a logout: a wrong password counts as one try.
+    caps.addFactoryAction({"probe", "Test connection", "Log in to the main Deco once and read its nodes."});
     // The web API on the main Deco; TP-Link's cloud is the app's business.
     caps.setTopologies(v1::Topology::Local);
     caps.setPairingStyles(v1::PairingStyle::Listing);
