@@ -61,18 +61,6 @@ v1::WifiBand band(const std::string &connectionType, const std::string &wireType
 
 } // namespace
 
-std::string dashedMac(const std::string &mac)
-{
-    std::string normal = sdk::ClientTracker::normalizedMac(mac);
-    for (char &c : normal) {
-        if (c == ':')
-            c = '-';
-        else
-            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
-    return normal;
-}
-
 std::string decodeName(const std::string &b64)
 {
     const std::optional<std::string> decoded = base64Decode(b64);
@@ -159,23 +147,6 @@ std::map<std::string, int> parseClientSignal(const Json &reply)
         const int best = margin > 0 ? margin : other;
         if (best > 0)
             out[mac] = marginToDbm(best);
-    }
-    return out;
-}
-
-std::vector<std::string> parseBlackList(const Json &reply)
-{
-    std::vector<std::string> out;
-    const Json list = jsonValue(jsonValue(reply, "result"), "client_list");
-    // Empty, it comes as {} rather than []; filled, entries are objects with
-    // the MAC or the MACs themselves.
-    if (!list.is_array())
-        return out;
-    for (const Json &entry : list) {
-        const std::string raw = entry.is_string() ? entry.get<std::string>() : jsonString(entry, "mac");
-        const std::string mac = sdk::ClientTracker::normalizedMac(raw);
-        if (!mac.empty())
-            out.push_back(mac);
     }
     return out;
 }

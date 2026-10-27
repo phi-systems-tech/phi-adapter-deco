@@ -6,7 +6,6 @@
 #include <functional>
 #include <map>
 #include <optional>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -123,7 +122,11 @@ protected:
         settings.awayDelayMs = std::int64_t{std::clamp(jsonInt(m_meta, sdk::kClientMetaAwayDelayS, 300), 0, 3600)} * 1000;
         settings.showGuests = jsonBool(m_meta, sdk::kClientMetaShowGuests);
         settings.ignorePrivateMacs = jsonBool(m_meta, sdk::kClientMetaIgnorePrivateMacs);
-        settings.canBlock = true;
+        // The Deco takes a block and does not enforce it in AP mode (the
+        // iPad stayed online and rejoined, pi5 2026-10-27): no switch until
+        // phi blocks as the router itself (ROADMAP "Cloud binding and network
+        // roles").
+        settings.canBlock = false;
         m_tracker.setSettings(settings);
         m_tracker.setTracked(macList(jsonValue(m_meta, sdk::kClientMetaTracked)));
         m_pollIntervalS = std::clamp(jsonInt(m_meta, kMetaPollIntervalS, kDefaultPollIntervalS), kMinPollIntervalS, 600);
@@ -144,60 +147,6 @@ protected:
             return;
         armPollTimer();
         poll();
-    }
-
-    void onChannelInvoke(const sdk::ChannelInvokeRequest &request) override
-    {
-        if (m_lifecycle != Lifecycle::Running || !m_session) {
-            answer(request.cmdId(), v1::CmdStatus::TemporarilyOffline, "Instance is not running");
-            return;
-        }
-        if (request.channelExternalId() != sdk::kClientChannelNetworkAccess
-            || !m_tracker.isTracked(request.deviceExternalId())) {
-            answer(request.cmdId(), v1::CmdStatus::NotSupported, "Channel not supported");
-            return;
-        }
-        const bool *allow = std::get_if<bool>(&request.value());
-        if (!allow) {
-            answer(request.cmdId(), v1::CmdStatus::InvalidArgument, "Expected a boolean");
-            return;
-        }
-        if (m_loginRefused) {
-            answer(request.cmdId(), v1::CmdStatus::Failure, "The Deco refused the password");
-            return;
-        }
-        const std::string mac = dashedMac(request.deviceExternalId());
-        Json payload;
-        if (*allow) {
-            payload = {{"operation", "unblock"}, {"params", {{"client_list", Json::array({mac})}}}};
-        } else {
-            const std::string name = request.deviceExternalId();
-            payload = {{"operation", "block"},
-                       {"params",
-                        {{"client_list",
-                          Json::array({{{"mac", mac}, {"name", base64Encode(name)}, {"client_type", "other"}}})}}}};
-        }
-        const v1::CmdId cmdId = request.cmdId();
-        const bool wanted = *allow;
-        auto code = std::make_shared<int>(-1);
-        std::vector<DecoSession::Step> steps;
-        steps.push_back({"admin/client", "black_list", payload,
-                         [code](const Json &reply, std::vector<DecoSession::Step> &) {
-                             *code = jsonInt(reply, "error_code", -1);
-                         }});
-        enqueue(std::move(steps), [this, cmdId, wanted, code](DecoSession::Result result) {
-            if (result.outcome != DecoSession::Outcome::Ok || *code != 0) {
-                answer(cmdId, v1::CmdStatus::Failure,
-                       result.outcome != DecoSession::Outcome::Ok ? result.error
-                                                                  : "the Deco answered error " + std::to_string(*code));
-                return;
-            }
-            v1::CmdResponse response = responseFor(cmdId, v1::CmdStatus::Success, {});
-            response.setFinalValue(wanted);
-            sendCommandResponse(std::move(response));
-            // Read it back at once rather than in a minute.
-            poll();
-        });
     }
 
     void onPairingStart(const sdk::PairingStartRequest &request) override
@@ -370,7 +319,6 @@ private:
             std::map<std::string, std::size_t> clientsPerNode;
             std::vector<sdk::NetworkClientSighting> seen;
             std::map<std::string, int> signal;
-            std::optional<std::vector<std::string>> blocked;
             bool complete = true;
         };
         auto snap = std::make_shared<Snapshot>();
@@ -408,46 +356,17 @@ private:
                              if (jsonInt(reply, "error_code", -1) == 0)
                                  snap->signal = parseClientSignal(reply);
                          }});
-        steps.push_back({"admin/client", "black_list", Json{{"operation", "list"}},
-                         [snap](const Json &reply, std::vector<DecoSession::Step> &) {
-                             if (jsonInt(reply, "error_code", -1) == 0)
-                                 snap->blocked = parseBlackList(reply);
-                         }});
         // The client lists run after device_list, before client_access: the
         // session inserts a step's follow-ups right behind it.
         enqueue(std::move(steps), [this, snap](DecoSession::Result result) {
             if (result.outcome != DecoSession::Outcome::Ok || !snap->complete || snap->nodes.empty())
                 return;   // not knowing is not everyone having left
             publishNodes(snap->nodes, snap->clientsPerNode);
-            std::set<std::string> online;
             for (auto &s : snap->seen) {
-                online.insert(s.mac);
                 const auto sig = snap->signal.find(s.mac);
                 if (sig != snap->signal.end())
                     s.rssiDbm = sig->second;
-                if (snap->blocked)
-                    s.blocked = std::find(snap->blocked->begin(), snap->blocked->end(), s.mac) != snap->blocked->end();
             }
-            // A blocked client is off the WLAN, so no node lists it: it still
-            // needs its switch to say so.
-            if (snap->blocked)
-                for (const std::string &mac : *snap->blocked)
-                    if (!online.count(mac)) {
-                        sdk::NetworkClientSighting s;
-                        s.mac = mac;
-                        s.online = false;
-                        s.blocked = true;
-                        snap->seen.push_back(std::move(s));
-                    }
-            for (const std::string &mac : m_tracker.tracked())
-                if (snap->blocked && !online.count(mac)
-                    && std::find(snap->blocked->begin(), snap->blocked->end(), mac) == snap->blocked->end()) {
-                    sdk::NetworkClientSighting s;
-                    s.mac = mac;
-                    s.online = false;
-                    s.blocked = false;
-                    snap->seen.push_back(std::move(s));
-                }
             m_tracker.update(snap->seen, nowMs());
         }, true);
     }

@@ -42,9 +42,6 @@ std::vector<phicore::adapter::sdk::NetworkClientSighting> parseClientList(const 
 /// dBm per client MAC from `client_access`.
 std::map<std::string, int> parseClientSignal(const Json &reply);
 
-/// The blocked client MACs (`black_list`, operation list).
-std::vector<std::string> parseBlackList(const Json &reply);
-
 /// `client_access` reports the signal as a positive number (16-70 here, with
 /// signal levels 2 and 3 above ~30): the margin over the radio's noise floor,
 /// as Qualcomm drivers count it. dBm is that minus 95, the floor they assume.
@@ -59,8 +56,5 @@ std::string nodeDeviceId(const DecoNode &node);
 phicore::adapter::v1::Device buildNodeDevice(const DecoNode &node);
 phicore::adapter::v1::ChannelList buildNodeChannels();
 std::string nodeFingerprint(const DecoNode &node);
-
-/// `AA-BB-CC-DD-EE-FF` from any spelling, for the API's writes.
-std::string dashedMac(const std::string &mac);
 
 } // namespace phicore::deco::ipc

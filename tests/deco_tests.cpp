@@ -155,11 +155,6 @@ void testSignalAndBlackList()
     PHI_CHECK(signal.at("aa:bb:cc:00:11:22") == -45);
     PHI_CHECK(marginToDbm(200) == 0 && marginToDbm(-20) == -100);
 
-    PHI_CHECK(parseBlackList(Json::parse(R"({"error_code":0,"result":{"client_list":{}}})")).empty());
-    const auto blocked = parseBlackList(Json::parse(
-        R"({"error_code":0,"result":{"client_list":[{"mac":"D8-C8-0C-BB-66-3D","name":"eA=="},"AA-BB-CC-00-11-22"]}})"));
-    PHI_CHECK(blocked.size() == 2 && blocked[0] == "d8:c8:0c:bb:66:3d" && blocked[1] == "aa:bb:cc:00:11:22");
-    PHI_CHECK(dashedMac("d8:c8:0c:bb:66:3d") == "D8-C8-0C-BB-66-3D");
 }
 
 void testCapabilities()
