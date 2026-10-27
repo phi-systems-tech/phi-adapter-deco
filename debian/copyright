@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: phi-adapter-deco
+Source: https://phisys.com
+
+Files: *
+Copyright: 2026 Phisys Ltd. (Switzerland)
+License: unspecified
+ No redistribution license has been declared in this source tree.

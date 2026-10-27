@@ -1,0 +1,8 @@
+phi-adapter-deco (0.1.0-1) trixie; urgency=medium
+
+  * First release: TP-Link Deco mesh over the main Deco's local web API
+    (RSA + AES envelope, one admin round per poll, pinned certificate),
+    nodes as gateways, clients through the SDK 0.29 ClientTracker with
+    pairing style Listing, WLAN block as the network access switch.
+
+ -- Marius Schumacher <marius.schumacher@phisys.com>  Tue, 27 Oct 2026 10:18:37 +0100
