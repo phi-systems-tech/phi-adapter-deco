@@ -1,0 +1,10 @@
+{
+  "discovery": [
+    {
+      "kind": "tdp",
+      "tdpDeviceType": "HOMEWIFISYSTEM",
+      "tdpRole": "master",
+      "defaultPort": 443
+    }
+  ]
+}
