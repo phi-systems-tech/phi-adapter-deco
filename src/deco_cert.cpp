@@ -1,8 +1,11 @@
 #include "deco_cert.h"
 
+#include <cctype>
 #include <cerrno>
 #include <cstring>
+#include <fstream>
 #include <memory>
+#include <sstream>
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -139,6 +142,26 @@ std::string certificateFingerprint(const std::string &pem)
         out.push_back(kHex[md[i] & 0x0f]);
     }
     return out;
+}
+
+std::string neighbourMac(const std::string &ip)
+{
+    std::ifstream arp("/proc/net/arp");
+    std::string line;
+    std::getline(arp, line); // the header
+    while (std::getline(arp, line)) {
+        std::istringstream fields(line);
+        std::string address, hwType, flags, mac;
+        if (!(fields >> address >> hwType >> flags >> mac))
+            continue;
+        // 0x2 is ATF_COM: the entry is complete, the MAC was really seen.
+        if (address != ip || flags == "0x0" || mac == "00:00:00:00:00:00")
+            continue;
+        for (char &c : mac)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return mac;
+    }
+    return {};
 }
 
 } // namespace phicore::deco::ipc

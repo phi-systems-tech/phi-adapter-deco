@@ -228,6 +228,48 @@ private:
         return true;
     }
 
+    /// The pinned certificate was refused. When the Deco at the pinned
+    /// address now shows another certificate and the address still answers
+    /// with the instance's own MAC, the new certificate is taken and the
+    /// household told; anything else stays refused - "a new master, a reset,
+    /// or somebody in between" - and is the household's to decide. A MAC can
+    /// be forged; on a home network this is the owner's chosen middle way.
+    bool repinSameDevice()
+    {
+        const std::optional<std::string> pinned = readStateFile(kCertFile);
+        std::string error;
+        const std::optional<std::string> pem = fetchPeerCertificatePem(m_host, 443, std::chrono::seconds(5), &error);
+        if (!pinned || !pem)
+            return false;
+        const std::string was = certificateFingerprint(*pinned);
+        const std::string now = certificateFingerprint(*pem);
+        if (now.empty() || now == was)
+            return false;
+        const std::string expected = sdk::ClientTracker::normalizedMac(std::string(m_info.externalId()));
+        const std::string seen = sdk::ClientTracker::normalizedMac(neighbourMac(m_host));
+        if (expected.empty() || seen != expected) {
+            if (m_saidRepin != now) {
+                m_saidRepin = now;
+                sendError(sdk::LogCategory::Security,
+                          "The Deco at %1 shows a new certificate (SHA-256 %2) and answers with MAC %3, not %4: not trusted",
+                          {v1::Utf8String(m_host), v1::Utf8String(now), v1::Utf8String(seen.empty() ? "unknown" : seen),
+                           v1::Utf8String(expected)},
+                          {});
+            }
+            return false;
+        }
+        v1::Utf8String writeError;
+        if (!writeStateFile(kCertFile, *pem, &writeError)) {
+            log(sdk::LogLevel::Error, sdk::LogCategory::Internal, "certificate not kept: %1", {writeError});
+            return false;
+        }
+        log(sdk::LogLevel::Warn, sdk::LogCategory::Security,
+            "The Deco at %1 has a new certificate (SHA-256 %2, was %3); trusted: same address, same MAC %4",
+            {v1::Utf8String(m_host), v1::Utf8String(now), v1::Utf8String(was), v1::Utf8String(expected)});
+        m_session->setEndpoint(m_host, stateDirectory() + "/" + kCertFile);
+        return true;
+    }
+
     // --- rounds -----------------------------------------------------------
 
     void armPollTimer()
@@ -292,6 +334,13 @@ private:
         case DecoSession::Outcome::Unreachable:
         case DecoSession::Outcome::Protocol:
             setConnected(false);
+            // A Deco makes itself a new certificate when it restarts: taken
+            // again when the same device answers (owner, 2026-10-28).
+            if (result.error.find("certificate verification failed") != std::string::npos && repinSameDevice()) {
+                m_saidError.clear();
+                m_loop->post([this]() { poll(); });
+                return;
+            }
             if (result.error != m_saidError) {
                 m_saidError = result.error;
                 log(sdk::LogLevel::Warn, sdk::LogCategory::Network, "Deco %1: %2",
@@ -450,6 +499,8 @@ private:
     bool m_connected = false;
     bool m_loginRefused = false;
     std::string m_saidError;
+    /// The new certificate last refused for a foreign MAC: said once.
+    std::string m_saidRepin;
     std::map<std::string, std::string> m_reportedNodes;
 };
 

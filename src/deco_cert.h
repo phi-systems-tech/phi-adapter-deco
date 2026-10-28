@@ -7,7 +7,10 @@
 // SDK's client always checks the chain, so the master's certificate is taken
 // once - trust on first use - and handed to it as the only CA, with the name
 // check off. A different certificate later fails the handshake: a new master,
-// a reset, or somebody in between, and in each case the household decides.
+// a reset, or somebody in between. A Deco makes itself a new one when it
+// restarts, so the instance takes it again when the pinned address still
+// answers with the instance's own MAC (owner, 2026-10-28); otherwise the
+// household decides.
 
 #include <chrono>
 #include <optional>
@@ -25,5 +28,9 @@ std::optional<std::string> fetchPeerCertificatePem(const std::string &host, int 
 /// SHA-256 of the certificate in the PEM, hex with colons; empty when it does
 /// not parse. For the log line that says which certificate was trusted.
 std::string certificateFingerprint(const std::string &pem);
+
+/// The MAC the kernel's neighbour table holds for `ip` (/proc/net/arp),
+/// lower-case with colons; empty when there is no complete entry.
+std::string neighbourMac(const std::string &ip);
 
 } // namespace phicore::deco::ipc
