@@ -161,8 +161,29 @@ void testCapabilities()
 {
     const v1::AdapterCapabilities caps = capabilities();
     PHI_CHECK(v1::hasFlag(caps.flags(), v1::AdapterCapability::NetworkClients));
+    PHI_CHECK(v1::hasFlag(caps.flags(), v1::AdapterCapability::FactoryDiscovery));
     PHI_CHECK(caps.pairingStyles() == v1::PairingStyle::Listing);
     PHI_CHECK(caps.topologies() == v1::Topology::Local);
+}
+
+void testCandidateFilter()
+{
+    phicore::adapter::net::TdpAnswer answer;
+    answer.setDeviceType("HOMEWIFISYSTEM").setRole("master").setModel("X55").setMac("3c:64:cf:86:50:f8").setGroupName("Home");
+    const auto candidate = decoCandidateFor(answer, "192.168.18.1");
+    PHI_CHECK(candidate.has_value());
+    if (candidate) {
+        PHI_CHECK(candidate->externalId() == "3c:64:cf:86:50:f8");
+        PHI_CHECK(candidate->host() == "192.168.18.1");
+        PHI_CHECK(candidate->ip() == "192.168.18.1");
+        PHI_CHECK(candidate->port() == 443);
+    }
+    phicore::adapter::net::TdpAnswer satellite = answer;
+    satellite.setRole("slave");
+    PHI_CHECK(!decoCandidateFor(satellite, "192.168.18.2").has_value());
+    phicore::adapter::net::TdpAnswer camera = answer;
+    camera.setDeviceType("SMART.IPCAMERA");
+    PHI_CHECK(!decoCandidateFor(camera, "192.168.18.3").has_value());
 }
 
 } // namespace
@@ -177,5 +198,6 @@ int main()
     testClientList();
     testSignalAndBlackList();
     testCapabilities();
+    testCandidateFilter();
     return phi::testing::report("deco_tests");
 }

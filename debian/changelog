@@ -1,3 +1,12 @@
+phi-adapter-deco (0.2.0-1) trixie; urgency=medium
+
+  * The factory searches by itself: it answers core's factory.discover (SDK
+    0.37.0 net/tdp.h + net/udp_probe.h) with the main Deco of every mesh that
+    answers the TDP broadcast; deco-config.json is gone, core no longer runs
+    TDP.
+
+ -- Marius Schumacher <marius.schumacher@phisys.com>  Mon, 02 Nov 2026 12:25:46 +0100
+
 phi-adapter-deco (0.1.4-1) trixie; urgency=medium
 
   * A new certificate from the same Deco (it makes itself one when it

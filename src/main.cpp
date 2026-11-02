@@ -2,6 +2,9 @@
 // main loop. The mesh runtime lives in deco_instance, the web API in
 // deco_session and deco_crypto.
 
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
@@ -9,6 +12,8 @@
 #include <string>
 #include <unistd.h>
 
+#include "phi/adapter/net/tdp.h"
+#include "phi/adapter/net/udp_probe.h"
 #include "phi/adapter/sdk/loop_execution_backend.h"
 #include "phi/adapter/sdk/sidecar.h"
 #include "phi/runtime/loop.h"
@@ -22,6 +27,7 @@
 
 namespace sdk = phicore::adapter::sdk;
 namespace v1 = phicore::adapter::v1;
+namespace net = phicore::adapter::net;
 using namespace phicore::deco::ipc;
 
 namespace {
@@ -68,6 +74,10 @@ protected:
     /// round - login, the nodes, logout.
     void onFactoryActionInvoke(const sdk::AdapterActionInvokeRequest &request) override
     {
+        if (request.actionId() == v1::kFactoryDiscoverActionId) {
+            discover(request);
+            return;
+        }
         if (request.actionId() != "probe") {
             answer(request.cmdId(), v1::CmdStatus::NotSupported, "Factory action not supported");
             return;
@@ -158,6 +168,9 @@ protected:
 
     void onFactoryStopping() override
     {
+        if (m_search)
+            m_search->cancel();
+        m_search.reset();
         if (m_session)
             m_session->cancel();
         m_session.reset();
@@ -166,6 +179,49 @@ protected:
     }
 
 private:
+    /// factory.discover: one TDP broadcast, the main Deco of every mesh that answers.
+    void discover(const sdk::AdapterActionInvokeRequest &request)
+    {
+        phi::runtime::Loop *loop = phi::runtime::Loop::current();
+        if (!loop) {
+            answer(request.cmdId(), v1::CmdStatus::Failure, "No loop on the factory thread");
+            return;
+        }
+        if (m_search && m_search->running()) {
+            answer(request.cmdId(), v1::CmdStatus::Failure, "A search is already running");
+            return;
+        }
+        if (!m_search)
+            m_search = std::make_unique<net::UdpProbe>(*loop);
+        const int budgetMs = v1::discoveryTimeoutMs(request.paramsJson());
+        const auto window = std::chrono::milliseconds(std::max(800, budgetMs - 300));
+        auto found = std::make_shared<v1::DiscoveryCandidateList>();
+        const v1::CmdId cmdId = request.cmdId();
+        m_search->start(
+            "", net::kTdpPort, net::tdpProbePacket(), window,
+            [found](const std::string &fromIp, std::uint16_t, const std::string &bytes) {
+                net::TdpAnswer reply;
+                if (!net::parseTdpAnswer(bytes, &reply, nullptr))
+                    return;
+                const std::optional<v1::DiscoveryCandidate> candidate = decoCandidateFor(reply, fromIp);
+                if (!candidate)
+                    return;
+                for (const v1::DiscoveryCandidate &known : *found)
+                    if (known.externalId() == candidate->externalId())
+                        return;
+                found->push_back(*candidate);
+            },
+            [this, cmdId, found](std::string error) {
+                if (!error.empty()) {
+                    answer(cmdId, v1::CmdStatus::Failure, error);
+                    return;
+                }
+                auto response = v1::ActionResponse::success(cmdId);
+                v1::setDiscoveryCandidates(response, *found);
+                send(std::move(response));
+            });
+    }
+
     void answer(v1::CmdId cmdId, v1::CmdStatus status, const std::string &error)
     {
         send(v1::ActionResponse().setId(cmdId).setStatus(status).setError(error));
@@ -178,6 +234,7 @@ private:
             log(sdk::LogLevel::Error, sdk::LogCategory::Internal, "failed to send the factory result: %1", {error});
     }
 
+    std::unique_ptr<net::UdpProbe> m_search;
     std::optional<DecoSession> m_session;
     std::string m_probeCert;
 };

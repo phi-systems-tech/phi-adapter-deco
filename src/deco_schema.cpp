@@ -2,12 +2,14 @@
 
 #include <utility>
 
+#include "phi/adapter/net/tdp.h"
 #include "phi/adapter/sdk/network_clients.h"
 
 namespace phicore::deco::ipc {
 
 namespace sdk = phicore::adapter::sdk;
 namespace v1 = phicore::adapter::v1;
+namespace net = phicore::adapter::net;
 
 namespace {
 
@@ -57,7 +59,8 @@ v1::AdapterCapabilities capabilities()
     v1::AdapterCapabilities caps;
     caps.setRequired(v1::AdapterRequirement::Host | v1::AdapterRequirement::Password);
     caps.setFlags(v1::AdapterCapability::RequiresPolling | v1::AdapterCapability::NetworkClients
-                  | v1::AdapterCapability::SupportsProbe | v1::AdapterCapability::SupportsDiscovery);
+                  | v1::AdapterCapability::SupportsProbe | v1::AdapterCapability::SupportsDiscovery
+                  | v1::AdapterCapability::FactoryDiscovery);
     // One login, the nodes, a logout: a wrong password counts as one try.
     caps.addFactoryAction({"probe", "Test connection", "Log in to the main Deco once and read its nodes."});
     // The web API on the main Deco; TP-Link's cloud is the app's business.
@@ -72,6 +75,16 @@ v1::AdapterConfigSchema configSchema()
     schema.setFactory(section());
     schema.setInstance(section());
     return schema;
+}
+
+std::optional<v1::DiscoveryCandidate> decoCandidateFor(const net::TdpAnswer &answer, const std::string &fromIp)
+{
+    if (answer.deviceType() != "HOMEWIFISYSTEM" || answer.role() != "master" || fromIp.empty())
+        return std::nullopt;
+    v1::DiscoveryCandidate candidate = net::tdpCandidateFor(answer, fromIp);
+    // The instance talks HTTPS to the address the datagram came from.
+    candidate.setHost(fromIp).setIp(fromIp).setPort(443);
+    return candidate;
 }
 
 } // namespace phicore::deco::ipc

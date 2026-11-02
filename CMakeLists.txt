@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(phi-adapter-deco VERSION 0.1.0 DESCRIPTION "Phi TP-Link Deco adapter" LANGUAGES CXX)
+project(phi-adapter-deco VERSION 0.2.0 DESCRIPTION "Phi TP-Link Deco adapter" LANGUAGES CXX)
 
 include(GNUInstallDirs)
 set(CMAKE_CXX_STANDARD 20)
@@ -51,5 +51,3 @@ add_test(NAME deco_tests COMMAND deco_tests)
 
 install(TARGETS phi_adapter_deco_ipc
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/phi/plugins/adapters)
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/deco-config.json"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/phi/plugins/adapters)
